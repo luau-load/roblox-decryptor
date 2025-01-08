@@ -42,17 +42,69 @@ namespace decryptor
 		if (!page_info_lea)
 			return;
 
-		constexpr std::array<std::uint8_t, 11> int3_sig = { 0x45, 0x31, 0xC0, 0x48, 0x8D, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xEB };
+		/* 5 byte mov, 2 byte xor */
+		constexpr std::array<uint8_t, 11> int3_type_0_sig = {
+			0x29, 0xCC,
+			0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+			0x31, 0xCC,
+			0x48, 0x8D
+		};
+
+		/* 5 byte mov, 3 byte xor */
+		constexpr std::array<uint8_t, 12> int3_type_1_sig = {
+			0x29, 0xCC,
+			0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+			0xCC, 0x31, 0xCC,
+			0x48, 0x8D
+		};
+
+		/* 6 byte mov, 2 byte xor */
+		constexpr std::array<uint8_t, 12> int3_type_2_sig = {
+			0x29, 0xCC,	
+			0x41, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+			0x31, 0xCC,
+			0x48, 0x8D
+		};
+
+		/* 6 byte mov, 3 byte xor */
+		constexpr std::array<uint8_t, 13> int3_type_3_sig = {
+			0x29, 0xCC,
+			0x41, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+			0xCC, 0x31, 0xCC,
+			0x48, 0x8D
+		};
 		
-		auto int3_info = utils::signature_scan(hyperion_code.virtual_range.base, hyperion_code.virtual_range.size, int3_sig);
-
-		if (!int3_info) {
-			std::printf("Failed to locate INT3 info!\n");
-			return;
+		auto int3_info = utils::signature_scan(hyperion_code.virtual_range.base, hyperion_code.virtual_range.size, int3_type_0_sig);
+		if (int3_info)
+		{
+			int3_table_size = *reinterpret_cast<std::uint32_t*>(int3_info + 3);
+			int3_decryption_table = int3_info + *reinterpret_cast<std::int32_t*>(int3_info + 12) + 16;
+			goto dont_ask;
 		}
+		int3_info = utils::signature_scan(hyperion_code.virtual_range.base, hyperion_code.virtual_range.size, int3_type_1_sig);
+		if (int3_info)
+		{
+			int3_table_size = *reinterpret_cast<std::uint32_t*>(int3_info + 3);
+			int3_decryption_table = int3_info + *reinterpret_cast<std::int32_t*>(int3_info + 13) + 17;
+			goto dont_ask;
+		}
+		int3_info = utils::signature_scan(hyperion_code.virtual_range.base, hyperion_code.virtual_range.size, int3_type_2_sig);
+		if (int3_info)
+		{
+			int3_table_size = *reinterpret_cast<std::uint32_t*>(int3_info + 4);
+			int3_decryption_table = int3_info + *reinterpret_cast<std::int32_t*>(int3_info + 13) + 17;
+			goto dont_ask;
+		}
+		int3_info = utils::signature_scan(hyperion_code.virtual_range.base, hyperion_code.virtual_range.size, int3_type_3_sig);
+		if (int3_info)
+		{
+			int3_table_size = *reinterpret_cast<std::uint32_t*>(int3_info + 4);
+			int3_decryption_table = int3_info + *reinterpret_cast<std::int32_t*>(int3_info + 14) + 18;
+			goto dont_ask;
+		}
+		return;
 
-		int3_info_base = int3_info;
-
+dont_ask:
 		// Plus one because we include the end of the shl reg, 4 instruction
 		page_info_lea += 1;
 			
@@ -79,7 +131,7 @@ namespace decryptor
 
 	bool code_decryptor::is_initialized() const
 	{
-		return page_info_base != 0;
+		return int3_decryption_table != 0;
 	}
 
 	void code_decryptor::decrypt()
@@ -118,12 +170,9 @@ namespace decryptor
 		std::uintptr_t hyperion_base = get_base_from_handle(hyperion_handle);
 
 		// Sorry for naming convention, it's just my style.
-		std::uint32_t arraySize = *(std::uint32_t*)(int3_info_base - 4);
-		std::uintptr_t int3_lea = (int3_info_base + 3);
-		std::uintptr_t decryptionTable = int3_lea + *(std::int32_t*)(int3_lea + 3) + 7;
-
-		for (std::uint32_t i = 0; i < arraySize; i++) {
-			std::uintptr_t baseValue = decryptionTable + ((std::uintptr_t)i * 0x18);
+		printf("%X %llX\n", int3_table_size, int3_decryption_table - hyperion_base);
+		for (std::uint32_t i = 0; i < int3_table_size; i++) {
+			std::uintptr_t baseValue = int3_decryption_table + ((std::uintptr_t)i * 0x18);
 			std::uintptr_t address = roblox_base + *(uint32_t*)(baseValue + 0xA);
 			std::uint16_t instrLength = (*(std::uint16_t*)(baseValue) >> 11) & 7; 
 

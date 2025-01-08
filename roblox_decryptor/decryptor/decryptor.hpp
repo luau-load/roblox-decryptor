@@ -26,7 +26,8 @@ namespace decryptor
 		void* roblox_handle;
 
 		std::uintptr_t page_info_base;
-		std::uintptr_t int3_info_base;
+		std::uintptr_t int3_decryption_table;
+		std::uint32_t int3_table_size;
 		std::ofstream out_file;
 	};
 }
