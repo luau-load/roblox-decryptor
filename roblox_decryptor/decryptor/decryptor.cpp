@@ -170,7 +170,6 @@ dont_ask:
 		std::uintptr_t hyperion_base = get_base_from_handle(hyperion_handle);
 
 		// Sorry for naming convention, it's just my style.
-		printf("%X %llX\n", int3_table_size, int3_decryption_table - hyperion_base);
 		for (std::uint32_t i = 0; i < int3_table_size; i++) {
 			std::uintptr_t baseValue = int3_decryption_table + ((std::uintptr_t)i * 0x18);
 			std::uintptr_t address = roblox_base + *(uint32_t*)(baseValue + 0xA);
